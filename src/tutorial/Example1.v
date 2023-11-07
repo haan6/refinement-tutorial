@@ -29,7 +29,7 @@ Section DEMO.
     { ss. }
     ss. i. inv H.
     2:{ exfalso. eapply UNDEF. repeat econs. }
-    inv STEP. ss. split; auto.
+    inv STEP. ss. split; auto. 
     (* As you can see, simulation proofs can get very length.
        Thus one usually defines a tactic that automatically takes care of trivial steps.
        So let us define some simple tactics first.
@@ -98,6 +98,35 @@ End DEMO.
 Section EX.
   (** Prove the following refinements. Develop tactics to simplify the proofs. *)
 
+  (* Solves tgt undef case if tgt is not undef. *)
+  Ltac solve_tgt_ub := 
+    exfalso;
+    match goal with
+    | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
+    end;
+    repeat econs.
+
+  (* Makes a tgt step. *)
+  Ltac step_tgt_silent0 :=
+    match goal with
+    | [STEP: ceval _ _ _ |- _] => inv STEP
+    end;
+    ss; split; auto.
+
+  (* Combines above two tactics. *)
+  Ltac step_tgt_silent :=
+    try (econs 4;
+         [ss
+         | ss; intros ev st_tgt1 STEP0; inv STEP0;
+           [step_tgt_silent0 | solve_tgt_ub]
+        ]).
+
+  Ltac step_src_silent :=
+    try (econs 3;
+         ss; exists (inr LInternal); eexists;
+         [ econs; econs | ss; split; auto]).
+        
+  
   (* Ex1. Interactions with the external world is observable, so should be preserved. *)
   Definition src1 : com := <{ "a" :=@ "print" <[0 : aexp]>; ret "a" }>.
 
@@ -106,8 +135,57 @@ Section EX.
 
   Goal refines (Imp_Program1 src1) (Imp_Program1 tgt1).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program1, Imp_STS1, src1, tgt1, Imp_init. ss.
+    (* Make steps in tgt *)
+    step_tgt_silent.
+    step_tgt_silent.
+    inv H6.
+    step_tgt_silent.
+    step_tgt_silent.
 
+    (* Make a step in src *)
+    econs 3.
+    ss. exists (inr LInternal). eexists. split.
+    { econs. econs. }
+    ss. split; auto.
+
+    (* Make steps in both src and tgt *)
+    econs 2.
+    { ss. }
+    { ss. }
+    intros ev st_tgt1 STEP0; inv STEP0.
+    { inv STEP. inv H7. inv H1. inv H3. inv H2.
+      ss; split; auto.
+      eexists. split.
+      { econs. econs. econs. econs. econs. }
+      step_tgt_silent.
+
+      econs 3.
+      ss. exists (inr LInternal). eexists. split.
+      { econs. econs. }
+      ss. split; auto.
+
+      step_tgt_silent.
+      inv H5. inv H1.
+
+      econs 3.
+      ss. exists (inr LInternal). eexists. split.
+      { econs. econs. econs. econs. }
+      ss. split; auto.
+      
+      econs.
+      { simpl. eauto. }
+      { simpl. eauto. }
+      { simpl. eauto. } }
+
+    
+    
+  Admitted.  
+
+  Qed.
+    
+
+      
 
   (* Ex2. If semantics is given by Imp_STS1, memory accesses are also observable. *)
   Definition src2 : com := <{ &<1> := 5; "a" := &<1>; ret "a" }>.
