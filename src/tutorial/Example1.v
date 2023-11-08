@@ -123,8 +123,8 @@ Section EX.
 
   Ltac step_src_silent :=
     try (econs 3;
-         ss; exists (inr LInternal); eexists;
-         [ econs; econs | ss; split; auto]).
+         ss; exists (inr LInternal); eexists; split;
+         [repeat econs | ss; split; auto]).
         
   
   (* Ex1. Interactions with the external world is observable, so should be preserved. *)
@@ -137,54 +137,38 @@ Section EX.
   Proof.
     apply adequacy. unfold simulation, Imp_Program1, Imp_STS1, src1, tgt1, Imp_init. ss.
     (* Make steps in tgt *)
-    step_tgt_silent.
-    step_tgt_silent.
+    do 2 step_tgt_silent.
     inv H6.
-    step_tgt_silent.
-    step_tgt_silent.
+    do 2 step_tgt_silent.
 
     (* Make a step in src *)
-    econs 3.
-    ss. exists (inr LInternal). eexists. split.
-    { econs. econs. }
-    ss. split; auto.
+    step_src_silent.
 
     (* Make steps in both src and tgt *)
-    econs 2.
-    { ss. }
-    { ss. }
+    econs 2; ss.
     intros ev st_tgt1 STEP0; inv STEP0.
+    (* When tgt step is defined *)
     { inv STEP. inv H7. inv H1. inv H3. inv H2.
       ss; split; auto.
       eexists. split.
-      { econs. econs. econs. econs. econs. }
-      step_tgt_silent.
+      { repeat econs. }
 
-      econs 3.
-      ss. exists (inr LInternal). eexists. split.
-      { econs. econs. }
-      ss. split; auto.
+      step_tgt_silent.
+      step_src_silent.
 
       step_tgt_silent.
       inv H5. inv H1.
+      step_src_silent.
 
-      econs 3.
-      ss. exists (inr LInternal). eexists. split.
-      { econs. econs. econs. econs. }
-      ss. split; auto.
-      
       econs.
       { simpl. eauto. }
       { simpl. eauto. }
-      { simpl. eauto. } }
+      { auto. } }
+    (* When tgt step is undef *)
+    { solve_tgt_ub. }
 
-    
-    
-  Admitted.  
-
-  Qed.
-    
-
+    (* What is goal Z? *)
+    Admitted.
       
 
   (* Ex2. If semantics is given by Imp_STS1, memory accesses are also observable. *)
