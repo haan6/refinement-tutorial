@@ -166,10 +166,8 @@ Section EX.
       { auto. } }
     (* When tgt step is undef *)
     { solve_tgt_ub. }
-
-    (* What is goal Z? *)
-    Admitted.
-      
+    Unshelve. exact 1.
+  Qed.
 
   (* Ex2. If semantics is given by Imp_STS1, memory accesses are also observable. *)
   Definition src2 : com := <{ &<1> := 5; "a" := &<1>; ret "a" }>.
