@@ -20,8 +20,8 @@ Section DEMO.
     econs 4.
     { ss. }
     ss. i. inv H.
-    (* We have two cases: 1. normal step, 2. step is not defined. 
-       Step is defined for this case, so the second case is trivially solved. 
+    (* We have two cases: 1. normal step, 2. step is not defined.
+       Step is defined for this case, so the second case is trivially solved.
      *)
     2:{ exfalso. eapply UNDEF. repeat econs. }
     inv STEP. ss. split; auto.
@@ -29,7 +29,7 @@ Section DEMO.
     { ss. }
     ss. i. inv H.
     2:{ exfalso. eapply UNDEF. repeat econs. }
-    inv STEP. ss. split; auto. 
+    inv STEP. ss. split; auto.
     (* As you can see, simulation proofs can get very length.
        Thus one usually defines a tactic that automatically takes care of trivial steps.
        So let us define some simple tactics first.
@@ -39,7 +39,7 @@ Section DEMO.
   (** Note that a tactic defined inside a section can only be used in that section, in general. *)
 
   (* Solves tgt undef case if tgt is not undef. *)
-  Ltac solve_tgt_ub := 
+  Ltac solve_tgt_ub :=
     exfalso;
     match goal with
     | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
@@ -71,7 +71,7 @@ Section DEMO.
     do 3 step_tgt_silent.
     inv H6. inv H4. inv H5. inv H6. inv H7. inv H1. ss.
     step_tgt_silent.
-    (* Now evaluate return commands. 
+    (* Now evaluate return commands.
        When both src and tgt needs to progress, usually taking tgt step first is better;
        we are usually proving 'forall tgt event, exists src event'.
      *)
@@ -99,7 +99,7 @@ Section EX.
   (** Prove the following refinements. Develop tactics to simplify the proofs. *)
 
   (* Solves tgt undef case if tgt is not undef. *)
-  Ltac solve_tgt_ub := 
+  Ltac solve_tgt_ub :=
     exfalso;
     match goal with
     | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
@@ -125,8 +125,8 @@ Section EX.
     try (econs 3;
          ss; exists (inr LInternal); eexists; split;
          [repeat econs | ss; split; auto]).
-        
-  
+
+
   (* Ex1. Interactions with the external world is observable, so should be preserved. *)
   Definition src1 : com := <{ "a" :=@ "print" <[0 : aexp]>; ret "a" }>.
 
@@ -140,33 +140,31 @@ Section EX.
     do 2 step_tgt_silent.
     inv H6.
     do 2 step_tgt_silent.
-
     (* Make a step in src *)
     step_src_silent.
 
     (* Make steps in both src and tgt *)
     econs 2; ss.
     intros ev st_tgt1 STEP0; inv STEP0.
-    (* When tgt step is defined *)
-    { inv STEP. inv H7. inv H1. inv H3. inv H2.
-      ss; split; auto.
-      eexists. split.
-      { repeat econs. }
-
-      step_tgt_silent.
-      step_src_silent.
-
-      step_tgt_silent.
-      inv H5. inv H1.
-      step_src_silent.
-
-      econs.
-      { simpl. eauto. }
-      { simpl. eauto. }
-      { auto. } }
     (* When tgt step is undef *)
-    { solve_tgt_ub. }
-    Unshelve. exact 1.
+    2:{ solve_tgt_ub. Unshelve. exact 1. }
+    (* When tgt step is defined *)
+    inv STEP. inv H7. inv H1. inv H3. inv H2.
+    ss; split; auto.
+    eexists. split.
+    { repeat econs. }
+
+    step_tgt_silent.
+    step_src_silent.
+
+    step_tgt_silent.
+    inv H5. inv H1.
+    step_src_silent.
+
+    econs.
+    { simpl. eauto. }
+    { simpl. eauto. }
+    { auto. }
   Qed.
 
   (* Ex2. If semantics is given by Imp_STS1, memory accesses are also observable. *)
@@ -177,26 +175,78 @@ Section EX.
 
   Goal refines (Imp_Program1 src2) (Imp_Program1 tgt2).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program1, Imp_STS1, src2, tgt2, Imp_init. ss.
+    (* Make a step in tgt *)
+    do 2 step_tgt_silent.
+    inv H6.
+    do 2 step_tgt_silent.
+    step_src_silent.
 
+    (* Make steps in both src and tgt *)
+    econs 2; ss.
+    intros ev st_tgt1 STEP0; inv STEP0.
+    2:{ solve_tgt_ub. }
+    inv STEP. inv H6. inv H4. inv H5. inv H1.
+    ss; split; auto.
+    eexists. split.
+    { repeat econs. }
+
+    do 2 step_src_silent.
+    do 2 step_tgt_silent.
+    econs 2; ss.
+    intros ev st_tgt1 STEP0; inv STEP0.
+    2:{ solve_tgt_ub. }
+    inv STEP. inv H6.
+    ss; split; auto.
+    eexists. split.
+    { repeat econs. }
+
+    do 2 step_src_silent.
+    do 2 step_tgt_silent.
+    inv H5. inv H1.
+
+    econs.
+    { simpl. auto. }
+    { simpl. auto. }
+    { reflexivity. }
+  Qed.
+  
   (* But, if we want to reason about compiler optimizations for example,
      we do not want to keep memory accesses visible.
-     Imp_STS2 is the right semantics for this. 
+     Imp_STS2 is the right semantics for this.
    *)
   Definition src2' : com := <{ ret 5 }>.
 
   Goal refines (Imp_Program2 src2') (Imp_Program2 tgt2).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program2, Imp_STS2, src2', tgt2, Imp_init. ss.
 
+    (* Make silent steps in tgt until ret *)
+    do 3 step_tgt_silent.
+    do 3 step_tgt_silent.
+    do 3 step_tgt_silent.
+    inv H6. inv H8. inv H7. inv H4. inv H5. inv H1. ss.
+
+    step_src_silent.
+    step_tgt_silent.
+    inv H5. inv H1.
+
+    econs.
+    { simpl. auto. }
+    { simpl. auto. }
+    { reflexivity. }
+  Qed.
+    
 
   (* Ex3. If the source program can exhibit undefined behavior, refinement always holds. *)
   Definition src3 : com := <{ ret "a" }>.
 
   Goal forall tgt, refines (Imp_Program1 src3) (Imp_Program1 tgt).
   Proof.
-  Admitted.
-
+    intros tgt.    
+    unfold refines, Imp_Program1, Imp_STS1, src3, Imp_init. ss.
+    intros trace.
+    Admitted.
 
   (* Ex4. If a loop always terminates, we can prove it by induction. *)
   Definition src4 : com := <{ ret 0 }>.
@@ -243,7 +293,7 @@ Section DIV.
 
 
   (* DIV2. However, we can't prove the following refinement because it can diverge.
-     Also note that even though src5 and tgt5 are the same programs 
+     Also note that even though src5 and tgt5 are the same programs
      (thus trivially refines each other), our simulation relation is too weak to prove this.
      Compare this with Ex1 and Ex4.
    *)
