@@ -126,6 +126,11 @@ Section EX.
          ss; exists (inr LInternal); eexists; split;
          [repeat econs | ss; split; auto]).
 
+  Ltac step_term :=
+    try (econs;
+         [ simpl; eauto
+           | simpl; eauto
+           | reflexivity ]).
 
   (* Ex1. Interactions with the external world is observable, so should be preserved. *)
   Definition src1 : com := <{ "a" :=@ "print" <[0 : aexp]>; ret "a" }>.
@@ -161,10 +166,7 @@ Section EX.
     inv H5. inv H1.
     step_src_silent.
 
-    econs.
-    { simpl. eauto. }
-    { simpl. eauto. }
-    { auto. }
+    step_term.
   Qed.
 
   (* Ex2. If semantics is given by Imp_STS1, memory accesses are also observable. *)
@@ -205,12 +207,9 @@ Section EX.
     do 2 step_tgt_silent.
     inv H5. inv H1.
 
-    econs.
-    { simpl. auto. }
-    { simpl. auto. }
-    { reflexivity. }
+    step_term.
   Qed.
-  
+
   (* But, if we want to reason about compiler optimizations for example,
      we do not want to keep memory accesses visible.
      Imp_STS2 is the right semantics for this.
@@ -231,22 +230,24 @@ Section EX.
     step_tgt_silent.
     inv H5. inv H1.
 
-    econs.
-    { simpl. auto. }
-    { simpl. auto. }
-    { reflexivity. }
+    step_term.
   Qed.
-    
+
 
   (* Ex3. If the source program can exhibit undefined behavior, refinement always holds. *)
   Definition src3 : com := <{ ret "a" }>.
 
   Goal forall tgt, refines (Imp_Program1 src3) (Imp_Program1 tgt).
   Proof.
-    intros tgt.    
-    unfold refines, Imp_Program1, Imp_STS1, src3, Imp_init. ss.
-    intros trace.
-    Admitted.
+    intros tgt.
+    apply adequacy. unfold simulation, Imp_Program1, Imp_STS1, src3, Imp_init. ss.
+    econs 3.
+    { ss. }
+    ss. exists (inr LInternal).  exists (Mem.init, Undef).
+    econs. eapply Step_undefined. unfold not.
+    intros. inv H. inv H6. inv H1.
+    ss; split; auto.
+  Qed.
 
   (* Ex4. If a loop always terminates, we can prove it by induction. *)
   Definition src4 : com := <{ ret 0 }>.
@@ -257,11 +258,31 @@ Section EX.
        do ("x" := ("x" - 1))
        end;
        ret "x"
-    }>.
+      }>.
 
   Goal refines (Imp_Program1 src4) (Imp_Program1 tgt4).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program1, Imp_STS1, src4, Imp_init. ss.
+    step_src_silent.
+    do 4 step_tgt_silent.
+    inv H6.
+    remember Reg.init as reg. clear Heqreg.
+    remember 100 as n. clear Heqn.
+    revert reg.
+    induction n.
+    Admitted.
+  (*   step_tgt_silent. *)
+  (*   - clear IH. *)
+  (*     inv H6. inv H1. *)
+  (*     do 2 step_tgt_silent. inv H5. inv H1. *)
+  (*     step_term. *)
+  (*   - rename H7 into TRUE. inv H6. inv H1. *)
+  (*     do 2 step_tgt_silent. *)
+  (*   - exfalso. destruct (Z.eqb n 0) eqn:CASES. *)
+  (*     + eapply UNDEF. eapply E_WhileFalse. repeat econs. apply Z.eqb_eq; auto. *)
+  (*     + eapply UNDEF. eapply E_WhileTrue. repeat econs. apply Z.eqb_neq; auto. *)
+  (* Qed. *)
+
 
 End EX.
 
