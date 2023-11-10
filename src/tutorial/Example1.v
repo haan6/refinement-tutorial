@@ -4,6 +4,10 @@ From Tutorial Require Import Refinement.
 From Coq Require Import Strings.String List.
 From Tutorial Require Import Imp FiniteSimulation.
 
+Require Import ZArith.
+Require Import Zwf.
+Require Import Lia.
+
 Set Implicit Arguments.
 
 Section DEMO.
@@ -267,22 +271,42 @@ Section EX.
     do 4 step_tgt_silent.
     inv H6.
     remember Reg.init as reg. clear Heqreg.
-    remember 100 as n. clear Heqn.
+    remember 100 as n.
+    assert (CASES : (n = 0 \/ 0 < n)%Z). by lia.
+    clear Heqn.
     revert reg.
-    induction n.
-    Admitted.
-  (*   step_tgt_silent. *)
-  (*   - clear IH. *)
-  (*     inv H6. inv H1. *)
-  (*     do 2 step_tgt_silent. inv H5. inv H1. *)
-  (*     step_term. *)
-  (*   - rename H7 into TRUE. inv H6. inv H1. *)
-  (*     do 2 step_tgt_silent. *)
-  (*   - exfalso. destruct (Z.eqb n 0) eqn:CASES. *)
-  (*     + eapply UNDEF. eapply E_WhileFalse. repeat econs. apply Z.eqb_eq; auto. *)
-  (*     + eapply UNDEF. eapply E_WhileTrue. repeat econs. apply Z.eqb_neq; auto. *)
-  (* Qed. *)
-
+    induction n using (well_founded_ind (Zwf.Zwf_well_founded 0)).
+    destruct CASES as [CEq | CGt].
+    - rewrite CEq in H.
+      rewrite <- CEq.
+      step_tgt_silent.
+      + inv H7. inv H2.
+        do 2 step_tgt_silent.
+        inv H6. inv H2.
+        step_term.
+      + rename H8 into TRUE.
+        step_tgt_silent.
+        inv H8. inv H7. inv H2.
+        contradiction.
+    - step_tgt_silent.
+      + step_tgt_silent.
+        inv H7. inv H2.
+        ss.
+      + rename H8 into TRUE.
+        inv H7. inv H2.
+        step_tgt_silent.
+        step_tgt_silent.
+        apply H.
+        { unfold Zwf. split.
+          - lia.
+          - inv H7. inv H5. inv H6. inv H2.
+            ss. lia. }
+        { inv H7. inv H5. inv H6. inv H2.
+          ss. lia. }
+      + exfalso. destruct (Z.eqb n 0) eqn:CASES.
+        { eapply UNDEF. eapply E_WhileFalse. repeat econs. apply Z.eqb_eq; auto. }
+        { eapply UNDEF. eapply E_WhileTrue. repeat econs. apply Z.eqb_neq; auto. }
+  Qed.
 
 End EX.
 
