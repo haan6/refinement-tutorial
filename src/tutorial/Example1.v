@@ -266,7 +266,7 @@ Section EX.
 
   Goal refines (Imp_Program1 src4) (Imp_Program1 tgt4).
   Proof.
-    apply adequacy. unfold simulation, Imp_Program1, Imp_STS1, src4, Imp_init. ss.
+    apply adequacy. unfold simulation, Imp_Program1, Imp_STS1, src4, tgt4, Imp_init. ss.
     step_src_silent.
     do 4 step_tgt_silent.
     inv H6.
@@ -275,6 +275,7 @@ Section EX.
     assert (CASES : (n = 0 \/ 0 < n)%Z). by lia.
     clear Heqn.
     revert reg.
+
     induction n using (well_founded_ind (Zwf.Zwf_well_founded 0)).
     destruct CASES as [CEq | CGt].
     - rewrite CEq in H.
@@ -299,10 +300,8 @@ Section EX.
         apply H.
         { unfold Zwf. split.
           - lia.
-          - inv H7. inv H5. inv H6. inv H2.
-            ss. lia. }
-        { inv H7. inv H5. inv H6. inv H2.
-          ss. lia. }
+          - inv H7. inv H5. inv H6. inv H2. ss. lia. }
+        { inv H7. inv H5. inv H6. inv H2. ss. lia. }
       + exfalso. destruct (Z.eqb n 0) eqn:CASES.
         { eapply UNDEF. eapply E_WhileFalse. repeat econs. apply Z.eqb_eq; auto. }
         { eapply UNDEF. eapply E_WhileTrue. repeat econs. apply Z.eqb_neq; auto. }
@@ -312,6 +311,40 @@ End EX.
 
 Section DIV.
   (** Simulation in current form can't prove refinement between possibly diverging programs. *)
+
+  Ltac solve_tgt_ub :=
+    exfalso;
+    match goal with
+    | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
+    end;
+    repeat econs.
+
+  (* Makes a tgt step. *)
+  Ltac step_tgt_silent0 :=
+    match goal with
+    | [STEP: ceval _ _ _ |- _] => inv STEP
+    end;
+    ss; split; auto.
+
+  (* Combines above two tactics. *)
+  Ltac step_tgt_silent :=
+    try (econs 4;
+         [ss
+         | ss; intros ev st_tgt1 STEP0; inv STEP0;
+           [step_tgt_silent0 | solve_tgt_ub]
+        ]).
+
+  Ltac step_src_silent :=
+    try (econs 3;
+         ss; exists (inr LInternal); eexists; split;
+         [repeat econs | ss; split; auto]).
+
+  Ltac step_term :=
+    try (econs;
+         [ simpl; eauto
+           | simpl; eauto
+           | reflexivity ]).
+
 
   (* DIV1. We can prove the following refinement, which always terminates. *)
   Definition src5 : com :=
@@ -334,8 +367,62 @@ Section DIV.
 
   Goal refines (Imp_Program2 src5) (Imp_Program2 tgt5).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program2, Imp_STS2, src5, tgt5, Imp_init. ss.
+    do 4 step_src_silent.
+    do 4 step_tgt_silent.
+    inv H6.
+    remember Reg.init as reg. clear Heqreg.
+    remember 100 as n.
+    assert (CASES : (n = 0 \/ 0 < n)%Z). by lia.
+    clear Heqn.
+    revert reg.
 
+    induction n using (well_founded_ind (Zwf.Zwf_well_founded 0)).
+    destruct CASES as [CEq | CGt].
+    - rewrite CEq in H.
+      do 2 step_tgt_silent.
+      + do 2 step_src_silent.
+        inv H7. inv H2.
+        step_src_silent.
+        step_tgt_silent.
+        inv H6. inv H2.
+        step_term.
+      + rename H8 into TRUE.
+        inv H7. inv H2.
+        contradiction.
+    - step_tgt_silent.
+      + step_tgt_silent.
+        do 2 step_src_silent.
+        { inv H7. inv H2. lia. }
+        { step_src_silent. step_tgt_silent.
+          inv H6. inv H7. inv H2. inv H3.
+          step_term. }
+      + rename H8 into TRUE.
+        econs 3; ss.
+        exists (inr LInternal); eexists; split.
+        { inv H7. inv H2. econs. eapply E_WhileTrue. repeat econs. apply TRUE. }
+        { ss; split; auto. inv H7. inv H2.
+          step_src_silent.
+          step_tgt_silent.
+          econs 2; ss.
+          intros ev st_tgt1 STEP0; inv STEP0.
+          - inv STEP. ss; split; auto.
+            eexists. split.
+            + repeat econs. apply H8.
+            + do 3 step_src_silent.
+              do 3 step_tgt_silent.
+              inv H8. inv H7. inv H2. inv H4. inv H8. inv H9. inv H3. inv H2.
+              apply H.
+              { unfold Zwf. split.
+                - lia.
+                - ss. lia. }
+              { ss. lia. }
+          - solve_tgt_ub. }
+      + exfalso. destruct (Z.eqb n 0) eqn:CASES.
+        { eapply UNDEF. eapply E_WhileFalse. repeat econs. apply Z.eqb_eq; auto. }
+        { eapply UNDEF. eapply E_WhileTrue. repeat econs. apply Z.eqb_neq; auto. }
+        Unshelve. exact 1.
+  Qed.
 
   (* DIV2. However, we can't prove the following refinement because it can diverge.
      Also note that even though src5 and tgt5 are the same programs
