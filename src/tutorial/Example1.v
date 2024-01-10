@@ -138,40 +138,6 @@ Section EX.
            | simpl; eauto
            | reflexivity ]).
 
-  (* Solves tgt undef case if tgt is not undef. *)
-  Ltac solve_tgt_ub :=
-    exfalso;
-    match goal with
-    | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
-    end;
-    repeat econs.
-
-  (* Makes a tgt step. *)
-  Ltac step_tgt_silent0 :=
-    match goal with
-    | [STEP: ceval _ _ _ |- _] => inv STEP
-    end;
-    ss; split; auto.
-
-  (* Combines above two tactics. *)
-  Ltac step_tgt_silent :=
-    try (econs 4;
-         [ss
-         | ss; intros ev st_tgt1 STEP0; inv STEP0;
-           [step_tgt_silent0 | solve_tgt_ub]
-        ]).
-
-  Ltac step_src_silent :=
-    try (econs 3;
-         ss; exists (inr LInternal); eexists; split;
-         [repeat econs | ss; split; auto]).
-
-  Ltac step_term :=
-    try (econs;
-         [ simpl; eauto
-           | simpl; eauto
-           | reflexivity ]).
-
   (* Ex1. Interactions with the external world is observable, so should be preserved. *)
   Definition src1 : com :=
     <{ "a" :=@ "print" <[0 : aexp]>; ret "a" }>.
