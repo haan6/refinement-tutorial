@@ -27,7 +27,7 @@ Section EX.
     }>.
 
   (* Solves tgt undef case if tgt is not undef. *)
-  Ltac solve_tgt_ub := 
+  Ltac solve_tgt_ub :=
     exfalso;
     match goal with
     | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
@@ -69,6 +69,7 @@ Section EX.
     inv H6.
     (* The target reached a while loop. We take the source side to the loop too. *)
     do 4 step_src_silent.
+
     (** Now we start a coinductive proof. We first set up a coinductive hypothesis. *)
     clear ps pt.
     remember Reg.init as reg. clear Heqreg.
@@ -112,7 +113,7 @@ Section EX.
   Qed.
 
 
-  (** This simulation is sound, as proven by the adequacy theorem, and the following examples cannot be proven as expected. 
+  (** This simulation is sound, as proven by the adequacy theorem, and the following examples cannot be proven as expected.
       You can check that you cannot *unguard* the coinductive hypothesis, because either the source or the target side progress flag is not set to true.
    *)
 
@@ -134,6 +135,42 @@ Section EX.
 End EX.
 
 Section EXOPT.
+  (* Solves tgt undef case if tgt is not undef. *)
+  Ltac solve_tgt_ub :=
+    exfalso;
+    match goal with
+    | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
+    end;
+    repeat econs.
+
+  (* Makes a tgt step. *)
+  Ltac step_tgt_silent0 :=
+    match goal with
+    | [STEP: ceval _ _ _ |- _] => inv STEP
+    end;
+    ss; split; auto.
+
+  Ltac step_tgt_silent1 :=
+    try (econs 4;
+         [ss
+         | ss; intros ev st_tgt1 STEP0; inv STEP0;
+           [step_tgt_silent0 | solve_tgt_ub]
+        ]).
+
+  (* Combines above two tactics. *)
+  Ltac step_tgt_silent :=
+    try (guclo @sim_indC_spec; step_tgt_silent1).
+
+  (* Makes a src silent step. *)
+  Ltac step_src_silent1 :=
+    try (econs 3;
+         [ss
+         | ss; exists (inr LInternal); eexists; splits; ss; [repeat econs | ]
+      ]).
+
+  Ltac step_src_silent :=
+    try (guclo @sim_indC_spec; step_src_silent1).
+
   (** Code optimizations are insteresting examples to verify with our simulation.
       Note that you will need to find a loop invariant.
    *)
@@ -165,7 +202,111 @@ Section EXOPT.
 
   Goal refines (Imp_Program_Ext src_opt1) (Imp_Program_Ext tgt_opt1).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program_Ext, Imp_STS_Ext, src_opt1, tgt_opt1, Imp_init.
+    ss. intros.
+    ginit.
+    step_tgt_silent. step_src_silent.
+
+    guclo @sim_indC_spec. econs 2; ss.
+    i. inv H. inv STEP. inv H7. ss; split; auto.
+    eexists. split. repeat econs.
+    2: { solve_tgt_ub. Unshelve. exact O. }
+    step_tgt_silent1. step_src_silent1.
+
+    step_tgt_silent1. step_src_silent1.
+    step_tgt_silent1. econs 3; ss. do 2 eexists; splits. repeat econs. ss.
+    step_tgt_silent1. step_src_silent1.
+    step_tgt_silent1. step_src_silent1.
+    step_tgt_silent1. econs 3; ss. do 2 eexists; splits. repeat econs. ss.
+    step_tgt_silent1. step_src_silent1.
+
+    inv H6. inv H7. inv H1. inv H2.
+    step_tgt_silent1. step_src_silent1.
+    econs 6; ss.
+    remember Reg.init as reg. clear Heqreg.
+    remember Mem.init as mem. clear Heqmem.
+    revert reg n ps pt.
+    gcofix CIH. i.
+
+    step_tgt_silent.
+    - step_src_silent.
+      inv H6. inv H1. auto.
+      step_tgt_silent. step_src_silent.
+      inv H6. inv H1.
+      step_tgt_silent. step_src_silent.
+      guclo @sim_indC_spec. econs 1; ss.
+      inv H5. auto.
+    - rename H7 into TRUE. inv H6. inv H1.
+      step_tgt_silent.
+      guclo @sim_indC_spec. econs 3; ss. do 2 eexists. splits.
+      { econs 1. eapply E_WhileTrue. repeat econs. auto. }
+      { ss. }
+      step_src_silent.
+
+      guclo @sim_indC_spec. econs 2; ss.
+      i. inv H. inv STEP. inv H7. ss; split; auto.
+      eexists. split. repeat econs. 2: solve_tgt_ub.
+      step_tgt_silent1. step_src_silent1.
+      step_tgt_silent1. step_src_silent1.
+      econs 2; ss.
+      i. inv H. inv STEP. inv H7. ss; split; auto.
+      eexists. split. repeat econs. inv H1. inv H2. auto. auto.
+      step_tgt_silent1. step_src_silent1.
+      step_tgt_silent1. econs 3; ss. do 2 eexists. splits. repeat econs. ss.
+      step_tgt_silent1. step_src_silent1.
+      inv H1. inv H2. inv H3. inv H8. inv H1.
+
+
+      { econs 1. eapply E_WhileTrue. repeat econs. auto. }
+      { ss. }
+      step_src_silent.
+      eexists. split. repeat econs. 2: solve_tgt_ub.
+      step_tgt_silent1. step_src_silent1.
+
+      guclo @sim_indC_spec. econs 3; ss. do 2 eexists. splits.
+      { econs 1. eapply E_WhileTrue. repeat econs. auto. }
+      { ss. }
+
+      inv H6.
+      step_tgt_silent.
+      (* Tactic 'step_src_silent' picks wrong constructor, so we prove manually. *)
+      guclo @sim_indC_spec. econs 3; ss. do 2 eexists. splits.
+      { econs 1. eapply E_WhileTrue. repeat econs. auto. }
+      { ss. }
+      (* AAny introduces nondeterminism. We picks what we need when AAny is in the src. *)
+      guclo @sim_indC_spec. econs 3; ss. do 2 eexists. splits.
+      { econs 1. eapply E_Asgn. eapply (E_AAny _ n). }
+      { ss. }
+      step_src_silent.
+      (* Now we came back to the start of the while loop. We can end the proof by coinduction. *)
+      gstep. eapply sim_progress. 2,3: auto.
+      gfinal. left. eapply CIH.
+      Unshelve. exact 0.
+
+
+    step_tgt_silent1. step_src_silent1.
+    inv H6. inv H1. auto.
+    step_tgt_silent1. step_src_silent1.
+    step_tgt_silent1. step_src_silent1.
+    inv H6. inv H5. inv H1.
+    econs 1; ss.
+    inv H6. inv H1. clear H7.
+    remember Reg.init as reg. clear Heqreg.
+    revert reg n0 ps pt.
+
+    clear ps pt.
+    remember Reg.init as reg. clear Heqreg.
+    pose proof true as ps. pose proof true as pt.
+    revert reg n ps pt.
+
+
+    clear ps pt.
+    remember Reg.init as reg. clear Heqreg.
+    pose proof true as ps. pose proof true as pt.
+    revert reg n ps pt. gcofix CIH. i.
+
+Qed.
+
 
   (* OPT2. Load-to-load forwarding. *)
   Definition src_opt2 : com :=
@@ -196,7 +337,10 @@ Section EXOPT.
 
   Goal refines (Imp_Program_Ext src_opt2) (Imp_Program_Ext tgt_opt2).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program_Ext, Imp_STS_Ext, src_opt1, tgt_opt1, Imp_init.
+    ss. intros.
+    ginit.
+    guclo @sim_indC_spec.
 
   (* OPT3. Loop invariant code motion. *)
   Definition src_opt3 : com :=
@@ -224,6 +368,9 @@ Section EXOPT.
 
   Goal refines (Imp_Program_Ext src_opt3) (Imp_Program_Ext tgt_opt3).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program_Ext, Imp_STS_Ext, src_opt1, tgt_opt1, Imp_init.
+    ss. intros.
+    ginit.
+    guclo @sim_indC_spec.
 
 End EXOPT.
