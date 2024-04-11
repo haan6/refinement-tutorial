@@ -17,7 +17,7 @@ Section SIM.
   Notation ekind := event.(label_kind).
   Notation sort := sem.(state_sort).
 
-  (* This definition is almost the same as `sim' defined in FiniteSimulation.v, 
+  (* This definition is almost the same as `sim' defined in FiniteSimulation.v,
      but it is a coinductive definition, not an inductive one.
    *)
   Variant _sim
@@ -93,8 +93,8 @@ From Coq Require Import Strings.String List.
 From Tutorial Require Import Imp.
 
 Section EX.
-  (** Assuming that the above coinductive simulation is correct (i.e. adequacy theorem holds), 
-      we can prove refinements between possibly diverging programs. 
+  (** Assuming that the above coinductive simulation is correct (i.e. adequacy theorem holds),
+      we can prove refinements between possibly diverging programs.
    *)
 
   Hypothesis adequacy: forall {l: Event} {sem: @STS l} (src tgt: Program sem),
@@ -118,7 +118,7 @@ Section EX.
     }>.
 
   (* Solves tgt undef case if tgt is not undef. *)
-  Ltac solve_tgt_ub := 
+  Ltac solve_tgt_ub :=
     exfalso;
     match goal with
     | [UNDEF : forall _ _, ~ (ceval _ _ _) |- _] => eapply UNDEF
@@ -217,13 +217,37 @@ Section EX.
 
   Goal refines (Imp_Program_Ext src1) (Imp_Program_Ext tgt1).
   Proof.
-  Admitted.
-
+    apply adequacy. unfold simulation, Imp_Program_Ext, src1, tgt1, Imp_init. ss.
+    pfold. econs 4. ss.
+    ss. i. inv H. 2: solve_tgt_ub. step_tgt_silent0. left.
+    (* Now we start a coinductive proof. We first set up a coinductive hypothesis. *)
+    remember Reg.init as reg. clear Heqreg.
+    revert reg. pcofix CIH. i.
+    step_tgt_silent.
+    - inv H6.
+    - rename H7 into TRUE. inv H6.
+      step_tgt_silent.
+    - exfalso. eapply UNDEF. eapply E_WhileTrue. repeat econs. auto.
+  Qed.
 
   (* CEX2. The other way around. Prove this by coinduction. *)
   Goal refines (Imp_Program_Ext tgt1) (Imp_Program_Ext src1).
   Proof.
-  Admitted.
+    apply adequacy. unfold simulation, Imp_Program_Ext, tgt1, src1, Imp_init. ss.
+    pfold. econs 3; ss. do 2 eexists. splits.
+    - repeat econs.
+    - ss.
+    - left.
+      remember Reg.init as reg. clear Heqreg.
+      revert reg. pcofix CIH. i.
+      pfold. econs 3; ss. do 2 eexists. splits.
+      + econs 1. eapply E_WhileTrue. repeat econs. ss.
+      + ss.
+      + left. pfold. econs 3; ss. do 2 eexists. split.
+        { repeat econs. }
+        split; ss.
+      right. eapply CIH.
+  Qed.
 
   (** These counterexamples show that we need a mechanism to prevent *infinite stuttering*.
       Stuttering in simulation means that only one side (src or tgt) makes progress, while the other side stutters at the same state.
